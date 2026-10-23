@@ -1,0 +1,406 @@
+<title>Securing PHP Servers</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: single reading column, utilitarian security handbook; ink base, one amber signal accent, hardened-terminal feel */
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface-2: #ecebe4;
+    --ink: #1c1d22;
+    --muted: #5c5f6b;
+    --line: #d9d7cd;
+    --accent: #b5471f;
+    --accent-soft: #f2e2d6;
+    --ok: #2f7a4f;
+    --ok-soft: #dcefe2;
+    --crit: #b02a37;
+    --crit-soft: #f6ddde;
+    --code-bg: #1b1d24;
+    --code-fg: #e8e6df;
+    --code-key: #e0a84b;
+    --code-str: #7fb89a;
+    --code-dim: #8a8d99;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --display: "Space Grotesk", var(--sans);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15161b;
+      --surface: #1d1f26;
+      --surface-2: #24262f;
+      --ink: #eceae3;
+      --muted: #9a9dab;
+      --line: #32343f;
+      --accent: #e08a4a;
+      --accent-soft: #3a2a1c;
+      --ok: #6fc292;
+      --ok-soft: #1e3328;
+      --crit: #e9838d;
+      --crit-soft: #3a2226;
+      --code-bg: #101117;
+      --code-fg: #e8e6df;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15161b;
+    --surface: #1d1f26;
+    --surface-2: #24262f;
+    --ink: #eceae3;
+    --muted: #9a9dab;
+    --line: #32343f;
+    --accent: #e08a4a;
+    --accent-soft: #3a2a1c;
+    --ok: #6fc292;
+    --ok-soft: #1e3328;
+    --crit: #e9838d;
+    --crit-soft: #3a2226;
+    --code-bg: #101117;
+    --code-fg: #e8e6df;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding-left: max(18px, env(safe-area-inset-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+  }
+
+  /* Hero */
+  header.hero { padding-block: 54px 36px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(30px, 6vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .lede { font-size: clamp(16px, 2.4vw, 18px); color: var(--muted); margin: 0; max-width: 60ch; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .legend span {
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.04em;
+    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line);
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.crit { background: var(--crit); }
+  .dot.hi { background: var(--accent); }
+  .dot.base { background: var(--ok); }
+
+  /* Sections */
+  section { padding-block: 34px; border-bottom: 1px solid var(--line); }
+  .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+  .num {
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    font-weight: 500; flex: none;
+  }
+  h2 {
+    font-family: var(--display); font-weight: 600;
+    font-size: clamp(21px, 3.5vw, 26px); letter-spacing: -0.01em;
+    margin: 0; text-wrap: balance;
+  }
+  .sec-sub { color: var(--muted); margin: 0 0 20px 32px; font-size: 15px; }
+  @media (max-width: 480px) { .sec-sub { margin-left: 0; } }
+
+  ul.rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  ul.rules li {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--sev, var(--line));
+    border-radius: 9px;
+    padding: 15px 17px;
+  }
+  li.crit { --sev: var(--crit); }
+  li.hi { --sev: var(--accent); }
+  li.base { --sev: var(--ok); }
+  .rule-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; flex-wrap: wrap; }
+  .rule-title { font-weight: 600; font-size: 15.5px; }
+  .tag {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 5px; font-weight: 500;
+  }
+  .tag.crit { background: var(--crit-soft); color: var(--crit); }
+  .tag.hi { background: var(--accent-soft); color: var(--accent); }
+  .tag.base { background: var(--ok-soft); color: var(--ok); }
+  .rule-body { font-size: 14.5px; color: var(--muted); }
+  .rule-body code {
+    font-family: var(--mono); font-size: 0.86em;
+    background: var(--surface-2); padding: 1.5px 5px; border-radius: 4px; color: var(--ink);
+  }
+
+  /* Code blocks */
+  .code {
+    margin: 16px 0 4px; border-radius: 10px; overflow: hidden;
+    border: 1px solid var(--line); background: var(--code-bg);
+  }
+  .code-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 13px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .code-bar span { font-family: var(--mono); font-size: 11px; color: var(--code-dim); letter-spacing: 0.04em; }
+  .copy {
+    font-family: var(--mono); font-size: 11px; color: var(--code-fg);
+    background: rgba(255,255,255,0.08); border: none; border-radius: 5px;
+    padding: 4px 10px; cursor: pointer;
+  }
+  .copy:hover { background: rgba(255,255,255,0.16); }
+  .copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .code pre {
+    margin: 0; padding: 14px 15px; overflow-x: auto;
+    font-family: var(--mono); font-size: 13px; line-height: 1.7; color: var(--code-fg);
+  }
+  .code .c { color: var(--code-dim); }
+  .code .k { color: var(--code-key); }
+  .code .s { color: var(--code-str); }
+
+  /* Checklist */
+  .checklist { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 6px 4px; }
+  .checklist label {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 11px 14px; border-radius: 8px; cursor: pointer; font-size: 14.5px;
+  }
+  .checklist label:hover { background: var(--surface-2); }
+  .checklist input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--accent); flex: none; cursor: pointer; }
+  .checklist input:checked + span { color: var(--muted); text-decoration: line-through; }
+
+  footer { padding-block: 30px 46px; color: var(--muted); font-size: 13px; }
+  footer .note {
+    background: var(--accent-soft); border-radius: 9px; padding: 14px 16px;
+    color: var(--ink); font-size: 13.5px; margin-bottom: 18px;
+  }
+  a { color: var(--accent); }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="kicker">Server Hardening Handbook</p>
+    <h1>Keeping a PHP server out of attackers' hands</h1>
+    <p class="lede">A layered checklist for PHP teams: fix the code, lock down the runtime, harden the web server, and watch the host. Most breaches exploit one weak layer, so close them all.</p>
+    <div class="legend">
+      <span><i class="dot crit"></i> Critical</span>
+      <span><i class="dot hi"></i> High value</span>
+      <span><i class="dot base"></i> Baseline hygiene</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head"><span class="num">01</span><h2>Fix the code first</h2></div>
+    <p class="sec-sub">Most real attacks start in application code, not the OS. This layer matters most.</p>
+    <ul class="rules">
+      <li class="crit">
+        <div class="rule-top"><span class="rule-title">Use prepared statements</span><span class="tag crit">SQL injection</span></div>
+        <div class="rule-body">Bind every parameter with PDO or mysqli. Never concatenate user input into a query string.</div>
+      </li>
+      <li class="crit">
+        <div class="rule-top"><span class="rule-title">Never feed input to shell or eval</span><span class="tag crit">RCE</span></div>
+        <div class="rule-body">Keep user data out of <code>system()</code>, <code>exec()</code>, <code>shell_exec()</code>, <code>eval()</code>, and dynamic <code>include</code>/<code>require</code> paths. This is how a bug becomes a shell.</div>
+      </li>
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Escape all output</span><span class="tag hi">XSS</span></div>
+        <div class="rule-body">Wrap user data printed to HTML in <code>htmlspecialchars()</code>. Set a Content-Security-Policy header as a second line of defense.</div>
+      </li>
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Validate and whitelist input</span><span class="tag hi">Input</span></div>
+        <div class="rule-body">Check types, lengths, and allowed values on everything from <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code>, and headers. Reject rather than clean where you can.</div>
+      </li>
+      <li class="crit">
+        <div class="rule-top"><span class="rule-title">Lock down file uploads</span><span class="tag crit">Web shell</span></div>
+        <div class="rule-body">Store uploads outside the web root, rename them, verify real content type, and never let a <code>.php</code> file land in an executable directory.</div>
+      </li>
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Protect sessions and CSRF</span><span class="tag hi">Auth</span></div>
+        <div class="rule-body">Regenerate session IDs on login, hash passwords with <code>password_hash()</code>, and require a CSRF token on every state-changing form.</div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">02</span><h2>Harden the PHP runtime</h2></div>
+    <p class="sec-sub">A few php.ini settings contain the damage if something does slip through.</p>
+    <div class="code">
+      <div class="code-bar"><span>php.ini</span><button class="copy" data-code="php">Copy</button></div>
+<pre id="php"><span class="c">; hide version + errors from the world</span>
+<span class="k">expose_php</span> = Off
+<span class="k">display_errors</span> = Off
+<span class="k">log_errors</span> = On
+
+<span class="c">; block remote code inclusion</span>
+<span class="k">allow_url_fopen</span> = Off
+<span class="k">allow_url_include</span> = Off
+
+<span class="c">; disarm shell functions a web shell needs</span>
+<span class="k">disable_functions</span> = exec,passthru,shell_exec,system,proc_open,popen
+
+<span class="c">; fence PHP into the app directory</span>
+<span class="k">open_basedir</span> = <span class="s">/var/www/yourapp</span>
+
+<span class="c">; harden session cookies</span>
+<span class="k">session.cookie_httponly</span> = 1
+<span class="k">session.cookie_secure</span>   = 1
+<span class="k">session.cookie_samesite</span> = Strict</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">03</span><h2>Patch relentlessly</h2></div>
+    <p class="sec-sub">A huge share of PHP compromises target old, unpatched versions and dependencies.</p>
+    <ul class="rules">
+      <li class="crit">
+        <div class="rule-top"><span class="rule-title">Run a supported PHP version</span><span class="tag crit">EOL risk</span></div>
+        <div class="rule-body">Stay on an actively supported branch (PHP 8.3+) and apply security releases promptly. End-of-life versions get no fixes.</div>
+      </li>
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Audit your dependencies</span><span class="tag hi">Supply chain</span></div>
+        <div class="rule-body">Update framework, Composer packages, and any CMS or plugins regularly. Run <code>composer audit</code> to flag known-vulnerable packages.</div>
+      </li>
+    </ul>
+    <div class="code">
+      <div class="code-bar"><span>shell</span><button class="copy" data-code="audit">Copy</button></div>
+<pre id="audit"><span class="c"># flag vulnerable Composer packages</span>
+composer audit
+
+<span class="c"># update within your version constraints</span>
+composer update --with-dependencies</pre>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">04</span><h2>Guard the perimeter</h2></div>
+    <p class="sec-sub">The web server and network in front of PHP block most automated attacks before they reach your code.</p>
+    <ul class="rules">
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Put a WAF in front</span><span class="tag hi">Perimeter</span></div>
+        <div class="rule-body">Use Cloudflare, or ModSecurity with the OWASP Core Rule Set, to filter common injection and scanning traffic.</div>
+      </li>
+      <li class="base">
+        <div class="rule-top"><span class="rule-title">HTTPS everywhere</span><span class="tag base">Transport</span></div>
+        <div class="rule-body">Terminate TLS, redirect HTTP, and send an HSTS header so browsers refuse to downgrade.</div>
+      </li>
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Deny PHP execution in upload and asset paths</span><span class="tag hi">Web shell</span></div>
+        <div class="rule-body">Configure the web server so directories like <code>/uploads</code> can never run a PHP file, even if one is planted there.</div>
+      </li>
+      <li class="base">
+        <div class="rule-top"><span class="rule-title">Rate-limit and lock down admin</span><span class="tag base">Brute force</span></div>
+        <div class="rule-body">Throttle login endpoints, restrict admin panels by IP or VPN, and add fail2ban for repeated failures.</div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">05</span><h2>Lock down the host</h2></div>
+    <p class="sec-sub">If an attacker lands, the OS layer decides how far they can move.</p>
+    <ul class="rules">
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Least-privilege file permissions</span><span class="tag hi">Blast radius</span></div>
+        <div class="rule-body">Web files owned by a non-PHP user, the PHP worker read-only where possible, and nothing world-writable. Keep config and secrets out of the web root.</div>
+      </li>
+      <li class="base">
+        <div class="rule-top"><span class="rule-title">Firewall and minimal surface</span><span class="tag base">Exposure</span></div>
+        <div class="rule-body">Open only ports 80/443 (and SSH from trusted IPs). Disable unused services and remove default sample apps.</div>
+      </li>
+      <li class="base">
+        <div class="rule-top"><span class="rule-title">Harden SSH</span><span class="tag base">Access</span></div>
+        <div class="rule-body">Key-based auth only, no root login, and a non-standard flow behind fail2ban.</div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">06</span><h2>Watch and recover</h2></div>
+    <p class="sec-sub">You cannot stop everything, so plan to detect and bounce back fast.</p>
+    <ul class="rules">
+      <li class="hi">
+        <div class="rule-top"><span class="rule-title">Centralized logging and alerts</span><span class="tag hi">Detection</span></div>
+        <div class="rule-body">Ship access, error, and auth logs off the box. Alert on new PHP files in the web root and spikes in 500s or outbound traffic.</div>
+      </li>
+      <li class="crit">
+        <div class="rule-top"><span class="rule-title">Tested, offline backups</span><span class="tag crit">Recovery</span></div>
+        <div class="rule-body">Keep versioned backups an attacker cannot reach from the server, and actually test a restore. This is your answer to ransomware and defacement.</div>
+      </li>
+      <li class="base">
+        <div class="rule-top"><span class="rule-title">File integrity monitoring</span><span class="tag base">Detection</span></div>
+        <div class="rule-body">Track changes to core files so a dropped web shell or modified page triggers an alert.</div>
+      </li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head"><span class="num">07</span><h2>Quick checklist</h2></div>
+    <p class="sec-sub">Tick these off on your own server. Progress is saved in your browser.</p>
+    <div class="checklist" id="checklist">
+      <label><input type="checkbox" id="c1"><span>All DB queries use prepared statements</span></label>
+      <label><input type="checkbox" id="c2"><span>No user input reaches shell or eval functions</span></label>
+      <label><input type="checkbox" id="c3"><span>Uploads stored outside web root, PHP execution denied there</span></label>
+      <label><input type="checkbox" id="c4"><span>php.ini hardened (expose_php, disable_functions, open_basedir)</span></label>
+      <label><input type="checkbox" id="c5"><span>Running a supported PHP version, composer audit clean</span></label>
+      <label><input type="checkbox" id="c6"><span>WAF active and HTTPS + HSTS enforced</span></label>
+      <label><input type="checkbox" id="c7"><span>Least-privilege file permissions, secrets out of web root</span></label>
+      <label><input type="checkbox" id="c8"><span>Firewall limits open ports, SSH is key-only</span></label>
+      <label><input type="checkbox" id="c9"><span>Logs shipped off-box with alerting</span></label>
+      <label><input type="checkbox" id="c10"><span>Offline backups exist and a restore has been tested</span></label>
+    </div>
+  </section>
+
+  <footer>
+    <div class="note">This is a hardening guide, not a guarantee. Security is ongoing: review it as your stack and the threat landscape change. If you suspect an active breach, isolate the server, preserve logs, and rotate all credentials before cleaning up.</div>
+    <p>Share this page freely with your team. Checklist state is stored locally in each reader's browser and is never sent anywhere.</p>
+  </footer>
+</div>
+
+<script>
+  // Copy buttons
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var el = document.getElementById(btn.dataset.code);
+      var text = el ? el.innerText : "";
+      var done = function () { var o = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1400); };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(function () { selectText(el); });
+      } else { selectText(el); }
+    });
+  });
+  function selectText(el) {
+    if (!el) return;
+    var r = document.createRange(); r.selectNodeContents(el);
+    var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  // Checklist persistence (per-viewer convenience only)
+  var boxes = document.querySelectorAll("#checklist input");
+  try {
+    var saved = JSON.parse(localStorage.getItem("php-sec-checklist") || "{}");
+    boxes.forEach(function (b) { if (saved[b.id]) b.checked = true; });
+  } catch (e) {}
+  boxes.forEach(function (b) {
+    b.addEventListener("change", function () {
+      try {
+        var state = {};
+        boxes.forEach(function (x) { state[x.id] = x.checked; });
+        localStorage.setItem("php-sec-checklist", JSON.stringify(state));
+      } catch (e) {}
+    });
+  });
+</script>
